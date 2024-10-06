@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  question-service:
+    build: ./questionService
+    image: question-service:latest
+    ports:
+      - "8080:8080"  # Expose question service on port 8080
+    volumes:
+      - ./questionService:/usr/src/app  # For local development with live reloading
+      - question_service_node_modules:/usr/src/app/node_modules  # Named volume for node_modules
+    environment:
+      - NODE_ENV=development  # Set environment to development
+
+  user-service:
+    build: ./userService
+    image: user-service:latest
+    ports:
+      - "8081:8081"  # Expose user service on port 8081
+    volumes:
+      - ./userService:/usr/src/app  # For local development with live reloading
+      - user_service_node_modules:/usr/src/app/node_modules  # Named volume for node_modules
+    environment:
+      - NODE_ENV=development  # Set environment to development
+
+  frontend:
+    build: ./frontend
+    image: frontend:latest
+    ports:
+      - "3000:3000"  # Expose frontend on port 3000
+    depends_on:
+      - question-service
+      - user-service
+
+volumes:
+  question_service_node_modules:
+  user_service_node_modules:
