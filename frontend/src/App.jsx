@@ -11,6 +11,7 @@ import ProtectedRoute from "./pages/ProtectedRoute";
 import NavBar from "./components/NavBar";
 import MatchUsers from "./pages/MatchUsers";
 import CollabSpace from "./pages/CollabSpace";
+import Test from "./pages/Test";
 
 function App() {
     return (
@@ -25,6 +26,7 @@ function App() {
                 <Route path="/home" element={<Home />} />
                 <Route path="/collab/:roomId" element={<CollabSpace/>}/>
                 <Route path="/users-match" element={<MatchUsers />} />
+                <Route path="/test" element={<Test />} />
                 {/* Protected Routes */}
                 <Route element={<ProtectedRoute />}>
                     <Route path="/account-settings" element={<AccountSettings />} />

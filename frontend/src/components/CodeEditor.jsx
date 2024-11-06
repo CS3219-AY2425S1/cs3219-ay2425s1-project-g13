@@ -5,11 +5,13 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const serverWsUrl = "ws://localhost:4444";
 
 export default function CodeEditor({ roomId, onRoomClosed }) {
     const [isLeaving, setIsLeaving] = useState(false);
+    const [isRunning, setIsRunning] = useState(false);
     const theme = useTheme();
     const navigate = useNavigate();
     const editorRef = useRef();
@@ -66,6 +68,24 @@ export default function CodeEditor({ roomId, onRoomClosed }) {
         onRoomClosed();
     };
 
+    const handleRunCode = async () => {
+        setIsRunning(true);
+
+        if (editorRef.current) {
+            const code = editorRef.current.getValue(); // Get the current code
+            const body = {code: code}
+            try {
+                const response = await axios.post("http://localhost:8085/sandbox/execute", body)
+                console.log('Execution result:', response.data.output);
+                // Handle the response data as needed (e.g., display output to the user)
+            } catch (error) {
+                console.error('Error executing code:', error);
+            }
+        }
+
+        setIsRunning(false);
+    };
+
     useEffect(() => {
         // Cleanup on component unmount
         return () => {
@@ -92,6 +112,11 @@ export default function CodeEditor({ roomId, onRoomClosed }) {
                     theme={theme.palette.mode === "dark" ? "vs-dark" : "vs-light"}
                     onMount={handleEditorDidMount}
                 />
+            </Box>
+            <Box sx={{ alignSelf: "flex-start", margin: 2 }}>
+                <Button variant="contained" color="secondary" onClick={handleRunCode} disabled={isRunning}>
+                    {isRunning ? "Running..." : "Run Code"}
+                </Button>
             </Box>
         </Box>
     );
