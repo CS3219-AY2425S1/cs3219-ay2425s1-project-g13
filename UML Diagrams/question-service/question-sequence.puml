@@ -1,0 +1,25 @@
+@startuml question
+title Question Service Sequence Diagram for Handling Question Matching
+
+actor Client as C
+participant "Question Service" as QS
+participant "Question Repository" as QR
+participant "MATCH_TO_QUESTION_QUEUE" as MQ
+participant "QUESTION_TO_USER_QUEUE" as UQ
+
+== CRUD Operations ==
+C -> QS : Send CRUD request for question
+QS -> QR : Perform CRUD operation
+QR --> QS : Return result
+QS --> C : Respond with result
+
+== Consuming Message from MATCH_TO_QUESTION_QUEUE ==
+MQ -> QS : Receive message with match request (complexity, topic)
+
+QS -> QR : Fetch random question based on criteria
+QR --> QS : Return random question
+
+== Publishing Message to QUESTION_TO_USER_QUEUE ==
+QS -> UQ : Publish message with matched question data
+
+@enduml

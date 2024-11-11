@@ -1,0 +1,36 @@
+@startuml collab
+title Real-Time Collaboration with Yjs and WebSockets
+
+actor Client as C
+participant "WebSocket Server" as WSS
+participant "Express Server" as ES
+participant "Yjs Room Manager" as YRM
+participant "Room" as RM
+
+C -> ES : Connects to WebSocket Server
+ES -> WSS : Establishes WebSocket connection
+
+== WebSocket Connection ==
+C -> WSS : WebSocket Connection Request
+WSS -> WSS : Extract roomId from URL
+WSS -> YRM : setupWSConnection(ws, roomId)
+
+alt Room Exists
+    YRM -> RM : Add Client (ws) to Room Set
+else New Room
+    YRM -> RM : Create new Room Set
+    YRM -> RM : Add Client (ws) to Room Set
+end
+
+C --> YRM : Sends collaborative updates
+YRM --> RM : Syncs Yjs Document in real-time
+RM --> C : Broadcasts updates to clients in room
+
+== Client Disconnects ==
+C -> WSS : Disconnect WebSocket
+WSS -> RM : Remove Client (ws) from Room Set
+alt Room Empty
+    RM -> RM : Delete Room Set
+end
+
+@enduml

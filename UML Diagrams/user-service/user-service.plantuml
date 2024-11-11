@@ -1,0 +1,45 @@
+@startuml
+
+skinparam rectangle {
+  BackgroundColor LightSteelBlue
+  BorderColor DarkSlateGray
+  FontColor Black
+}
+
+actor Client as client
+
+rectangle "User Service" as userService {
+  rectangle "Match Controller" as mc
+  rectangle "Auth Controller" as ac
+  rectangle "User Controller" as uc
+  rectangle "MongoDB\n(using Mongoose)" as mongo
+  rectangle "RabbitMQ" as rabbitmq {
+    queue "MATCH_REQUEST_QUEUE"
+    queue "QUESTION_TO_USER_QUEUE"
+  }
+}
+
+rectangle "Matching Service" as matchingService
+
+client -d-> mc : HTTP Request\n(match request)
+mc <-> "MATCH_REQUEST_QUEUE" : Publish match request\n(complexity, topic, userId, socketId);\nPublish cancel-match request
+
+client ------> ac : (Handle authentication)
+ac -d-> mongo
+
+client -d-> uc : (Manage user data)
+uc -l-> mongo
+
+"MATCH_REQUEST_QUEUE" -d-> matchingService : Forward match request
+
+mc -u-> client : HTTP Response\n(Match request received)
+
+matchingService -d-> "QUESTION_TO_USER_QUEUE" : Send match result\n(matched userId, matched userSocketId, question)
+
+"QUESTION_TO_USER_QUEUE" -r-> mc : Receive match result
+
+userService -r-> client : Emit 'match_found' event\n(via WebSocket)
+client -u-> client : Redirect to collaboration space
+
+client -d-> mc : Cancel match request
+@enduml

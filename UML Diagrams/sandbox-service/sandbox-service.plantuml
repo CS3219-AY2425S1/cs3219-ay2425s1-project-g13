@@ -1,0 +1,20 @@
+@startuml
+
+skinparam rectangle {
+  BackgroundColor LightGoldenRodYellow
+  BorderColor DarkGoldenRod
+  FontColor Black
+}
+
+actor Client as client
+
+rectangle "Sandbox Service" as sbService {
+    rectangle "Temporary Code File" as temp
+    rectangle "Docker-in-Docker Container" as docker
+}
+
+client <-> sbService : send REST API request with code;\nReturn output
+sbService -d-> temp : create
+sbService <-> docker : Execute code;\nReturn code output
+
+@enduml

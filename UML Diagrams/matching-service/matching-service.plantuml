@@ -1,0 +1,41 @@
+@startuml
+
+skinparam rectangle {
+  BackgroundColor LightSkyBlue
+  BorderColor DarkSlateGray
+  FontColor Black
+}
+
+actor Client as client
+
+rectangle "User Service" as userService {
+  queue "MATCH_REQUEST_QUEUE" as matchRequestQueue
+  queue "CANCEL_REQUEST_QUEUE" as cancelRequestQueue
+}
+
+rectangle "Matching Service" as matchingService {
+  database "Cache" as cache
+  rectangle "Matching Logic" as matchingLogic
+  queue "MATCH_TO_QUESTION_QUEUE" as matchToQuestionQueue
+}
+
+rectangle "Question Service" as questionService {
+  database "Question Database" as questionDb
+}
+
+client -l-> userService : HTTP Request\n(match request)
+userService -r-> matchRequestQueue : Publish match request
+
+matchRequestQueue --> matchingService : Consume match request
+matchingService -> matchingLogic : Check cache for matching user
+matchingLogic --> cache : Check complexity & topic
+
+matchToQuestionQueue --> questionService : Consume match data
+questionService -> questionDb : Select random question
+
+client -d-> userService : Cancel match request
+userService -> cancelRequestQueue : Publish cancel-match request
+cancelRequestQueue --> matchingService : Consume cancel request
+matchingService -> cache : Delete user from cache
+
+@enduml

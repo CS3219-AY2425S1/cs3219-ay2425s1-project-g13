@@ -1,0 +1,25 @@
+@startuml matching
+title Matching Service Sequence Diagram
+
+participant "Matching Service" as MS
+participant "Cache" as Cache
+participant "MESSAGE_REQUEST_QUEUE" as MRQ
+participant "MATCH_TO_QUESTION_QUEUE" as MQ
+participant "CANCEL_REQUEST_QUEUE" as CRQ
+
+== Consuming Match Request from MESSAGE_REQUEST_QUEUE ==
+MRQ -> MS : Receive match request message (user, topic, complexity)
+
+alt No match found in cache
+    MS -> Cache : Store user in cache
+else Match found in cache
+    MS -> Cache : Retrieve matching user from cache
+    MS -> Cache : Delete both users from cache
+    MS -> MQ : Publish match data to MATCH_TO_QUESTION_QUEUE
+end
+
+== Cancel Request from CANCEL_REQUEST_QUEUE ==
+CRQ -> MS : Receive cancel request message (user ID)
+MS -> Cache : Delete user from cache
+
+@enduml

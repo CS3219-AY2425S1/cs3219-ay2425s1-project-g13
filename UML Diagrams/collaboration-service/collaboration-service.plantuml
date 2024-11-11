@@ -1,0 +1,26 @@
+@startuml
+
+top to bottom direction
+
+skinparam rectangle {
+  BackgroundColor LightSteelBlue
+  BorderColor DarkSlateGray
+  FontColor Black
+}
+
+actor Client as client
+
+rectangle "Collaboration Service" as collabService {
+  rectangle "YJS Framework" as yjs
+  rectangle "WebSocket Connection" as wsc
+}
+
+client -d-> collabService : Request to join session
+
+wsc <-> yjs : Sync data across users
+
+collabService <-> wsc : Monitor room for user activity
+
+collabService -> collabService : Delete room
+
+@enduml

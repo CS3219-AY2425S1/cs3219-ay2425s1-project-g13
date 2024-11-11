@@ -1,0 +1,31 @@
+@startuml user
+title User Service Sequence Diagram
+
+actor Client as C
+participant "Socket.IO" as Socket
+participant "MongoDB (Mongoose)" as DB
+participant "User Service" as US
+participant "MATCH_REQUEST_QUEUE" as MRQ
+participant "QUESTION_TO_USER_QUEUE" as QUQ
+participant "Matching Service" as MS
+
+== User Authentication and Data Management ==
+C -> US : Send request for authentication/data management
+US -> DB : Perform user data operation
+DB --> US : Return result
+US --> C : Respond with result
+
+== Sending Match Request ==
+C -> US : Send match request (complexity, topic, userId, socketId)
+US -> MRQ : Publish match request to MATCH_REQUEST_QUEUE
+US --> C : Respond with HTTP response
+
+== Receiving Match Result ==
+QUQ -> US : Consume match result (matched user data, random question)
+US -> Socket : Emit 'match_found' event (matched data)
+
+== Cancel Match Request ==
+C -> US : Send cancel match request
+US -> MS : Send cancel match request to Matching Service
+
+@enduml

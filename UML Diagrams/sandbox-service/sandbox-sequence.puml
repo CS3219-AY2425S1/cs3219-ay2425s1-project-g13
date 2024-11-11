@@ -1,0 +1,20 @@
+@startuml sandbox
+title Sandbox Service for Code Execution
+
+actor Client as C
+participant "Sandbox Service" as SS
+participant "Docker-in-Docker (DinD)" as DIND
+
+== Code Execution Request ==
+C -> SS : Send code execution request (REST API)
+SS -> SS : Create temporary file with code
+
+== Sandbox Execution ==
+SS -> DIND : Execute code in Docker container
+DIND -> DIND : Run code in sandboxed environment
+
+== Response with Output ==
+DIND -> SS : Return code output
+SS -> C : Send output as HTTP response
+
+@enduml
