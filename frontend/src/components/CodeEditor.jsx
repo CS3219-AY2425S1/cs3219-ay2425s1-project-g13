@@ -11,7 +11,7 @@ import { CODE_SNIPPETS } from "../constants";
 const socket = io(import.meta.env.VITE_USER_URL);
 import axios from "axios";
 
-export default function CodeEditor({ roomId, provider, doc, onRoomClosed}) {
+export default function CodeEditor({ roomId, provider, doc }) {
     const [isRunning, setIsRunning] = useState(false);
     const [output, setOutput] = useState();
     const theme = useTheme();

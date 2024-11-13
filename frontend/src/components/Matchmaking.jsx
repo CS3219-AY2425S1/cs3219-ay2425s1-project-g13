@@ -46,6 +46,7 @@ const MatchComponent = () => {
         });
 
         socket.on("match_found", (data) => {
+            console.log("match data: ", data)
             setMatchedUserId(data.matchedUser.id);
             setMatchedRoomId(data.roomId);
             setMatchedQuestion(data.question);

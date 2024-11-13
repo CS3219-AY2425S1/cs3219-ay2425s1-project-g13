@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { findUserByEmail as _findUserByEmail } from "../model/repository.js";
 import { formatUserResponse } from "./user-controller.js";
+import db, { setData, getData } from '../db.js'
 
 export async function handleLogin(req, res) {
   const { email, password } = req.body;
@@ -22,7 +23,12 @@ export async function handleLogin(req, res) {
       }, process.env.JWT_SECRET, {
         expiresIn: "1d",
       });
-      return res.status(200).json({ message: "User logged in", data: { accessToken, authorized: true, ...formatUserResponse(user) } });
+
+      const session = await getData(`${user.id}`);
+
+      console.log("session: ", session)
+
+      return res.status(200).json({ message: "User logged in", data: { accessToken, authorized: true, session: session, ...formatUserResponse(user) } });
     } catch (err) {
       return res.status(500).json({ message: err.message });
     }

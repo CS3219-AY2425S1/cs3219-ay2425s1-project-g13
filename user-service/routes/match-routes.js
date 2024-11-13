@@ -1,7 +1,7 @@
 import express from "express";
 
 import { verifyAccessToken } from "../middleware/basic-access-control.js";
-import { createChannel, receiveMatchResult, receiveCancelResult } from "../rabbit/rabbit.js";
+import { createChannel, receiveMatchResult, receiveCancelResult, receiveDeleteRoomRequest } from "../rabbit/rabbit.js";
 import { requestMatch, cancelMatch } from "../controller/match-controller.js"
 
 
