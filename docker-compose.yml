@@ -77,18 +77,14 @@ services:
     image: sandbox-service:latest
     ports:
       - "8084:8084"
-    privileged: true
     volumes:
       - ./sandbox-service:/usr/src/app/sandbox-service
       - /usr/src/app/sandbox-service/node_modules
     environment:
       - NODE_ENV=development  # Set environment to development
-      - DOCKER_HOST=unix:///var/run/docker.sock
     depends_on:
       rabbitmq:
         condition: service_healthy  # Wait until RabbitMQ is healthy
-    command: >
-      sh -c "dockerd-entrypoint.sh & sleep 5 && docker pull python:3.9 && npm start"
 
   frontend:
     build: ./frontend

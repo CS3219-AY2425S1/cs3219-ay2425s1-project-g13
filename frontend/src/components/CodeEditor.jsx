@@ -14,6 +14,7 @@ import axios from "axios";
 export default function CodeEditor({ roomId, provider, doc, onRoomClosed}) {
     const [isRunning, setIsRunning] = useState(false);
     const [output, setOutput] = useState();
+    const [logs, setLogs] = useState();
     const theme = useTheme();
     const editorRef = useRef();
     const [language, setLanguage] = useState("javascript");
@@ -72,12 +73,25 @@ export default function CodeEditor({ roomId, provider, doc, onRoomClosed}) {
         if (editorRef.current) {
             const code = editorRef.current.getValue(); // Get the current code
             const body = {code: code};
+            console.log(language)
             try {
-                const response = await axios.post(`${import.meta.env.VITE_SANDBOX_URL}/sandbox/execute`, body);
-                console.log('Execution result:', response.data.output);
-                setOutput(response.data.output);
+                if (language == "python") {
+                    const response = await axios.post(`${import.meta.env.VITE_SANDBOX_URL}/sandbox/execute-py`, body);
+                    console.log(response.data.output);
+                    setLogs([""]);
+                    setOutput(response.data.output);
+                } else if (language == "javascript") {
+                    const response = await axios.post(`${import.meta.env.VITE_SANDBOX_URL}/sandbox/execute-js`, body);
+                    console.log(response.data.output);
+                    console.log(response.data.logs);
+                    setLogs(response.data.logs);
+                    setOutput(response.data.output);
+                } else {
+                    setOutput("Sorry, execution of this programming language is not supported yet!");
+                }
             } catch (error) {
                 setOutput('Error executing code');
+                setLogs([""]);
                 console.error('Error executing code:', error);
             }
         }
@@ -97,12 +111,8 @@ export default function CodeEditor({ roomId, provider, doc, onRoomClosed}) {
                     variant="outlined"
                     size="small"
                 >
-                    <MenuItem value="csharp">C#</MenuItem>
-                    <MenuItem value="java">Java</MenuItem>
-                    <MenuItem value="javascript">JavaScript</MenuItem>
-                    <MenuItem value="php">PHP</MenuItem>
                     <MenuItem value="python">Python</MenuItem>
-                    <MenuItem value="typescript">TypeScript</MenuItem>
+                    <MenuItem value="javascript">JavaScript</MenuItem>
                 </Select>
                 <Button variant="contained" /*onClick={formatCode}*/>
                     Format Code
@@ -131,7 +141,11 @@ export default function CodeEditor({ roomId, provider, doc, onRoomClosed}) {
             />
                         <Box sx={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <Card variant="outlined" sx={{ width: "100%", margin: "auto", marginTop: 4, padding: 2 }}>
-                    <CardContent>  
+                    <CardContent>
+                        <Typography component="pre" variant="body1" color="text.secondary">
+                            {"LOGS: "}
+                            {(logs || [""]).join('\n')}
+                        </Typography>  
                         <Typography variant="body1" color="text.secondary">
                             {"OUTPUT: "}
                             {output}

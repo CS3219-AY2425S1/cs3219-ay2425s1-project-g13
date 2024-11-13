@@ -2,7 +2,6 @@ const express = require('express');
 const { createServer } = require('http');
 const cors = require('cors');
 const dotenv = require('dotenv').config();
-const { WebSocketServer } = require('ws');
 const sandboxRouter = require('./routes/sandboxRoutes')
 
 /**
