@@ -1,3 +1,5 @@
+// CollabSpace.jsx
+
 import * as React from "react";
 import CodeEditor from "../components/CodeEditor";
 import Chat from "../components/Chat";
@@ -12,14 +14,19 @@ const serverWsUrl = import.meta.env.VITE_WS_COLLAB_URL;
 const CollabSpace = () => {
     const { roomId } = useParams();
     const location = useLocation();
-    const { question } = location.state;
+
+    const [question, setQuestion] = useState(location.state ? location.state.question : null);
+
     const [showRedirectMessage, setShowRedirectMessage] = useState(false);
     const [isLeaving, setIsLeaving] = useState(false);
-    const [isInitialized, setIsInitialized] = useState(false); // Loading state
+    const [isInitialized, setIsInitialized] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState("disconnected");
+    const [error, setError] = useState(null);
     const navigate = useNavigate();
     const docRef = useRef(null);
     const providerRef = useRef(null);
-    const hasClosedRef = useRef(false); // Flag to ensure `handleRoomClosed` is only called once
+    const hasClosedRef = useRef(false);
+    const customWsRef = useRef(null); // Custom WebSocket for messages
 
     const handleRoomClosed = () => {
         if (hasClosedRef.current) return; // Prevent multiple triggers
@@ -40,73 +47,141 @@ const CollabSpace = () => {
 
         setIsLeaving(true);
 
-        if (providerRef.current) {
-            providerRef.current.awareness.setLocalStateField("roomClosed", true);
+        providerRef.current.awareness.setLocalStateField("roomClosed", true);
 
-            setTimeout(() => {
-                navigate("/users-match");
-                setIsLeaving(false);
-            }, 3000);
-        }
+        setTimeout(() => {
+            navigate("/users-match");
+            setIsLeaving(false);
+        }, 3000);
     };
 
     useEffect(() => {
-        console.log("mounting");
+        
+        docRef.current = new Y.Doc();
 
-        if (question) {
-            console.log(question);
-        }
+        const awarenessUpdateHandler = ({ added, updated, removed }) => {
+            const states = providerRef.current.awareness.getStates();
+            console.log("Awareness states updated:", states);
 
-        if (!docRef.current) {
-            docRef.current = new Y.Doc();
-        }
-
-        if (!providerRef.current) {
-            providerRef.current = new WebsocketProvider(`${serverWsUrl}?room=${roomId}`, roomId, docRef.current);
-            setIsInitialized(true); // Mark initialization as complete once provider is set
-        }
-
-        const awarenessUpdateHandler = () => {
-            if (providerRef.current && !hasClosedRef.current) {
-                const awarenessStates = providerRef.current.awareness.getStates();
-                awarenessStates.forEach((state) => {
-                    if (state.roomClosed) {
-                        console.log("room closed!!");
-                        handleRoomClosed();
-                    }
-                });
+            
+            for (const [clientID, state] of states.entries()) {
+                if (state.roomClosed && !hasClosedRef.current) {
+                    console.log("Room closure detected!");
+                    handleRoomClosed();
+                    break;
+                }
             }
         };
+        try {
+            const wsUrl = `${serverWsUrl}?room=${roomId}`;
+            console.log("Attempting Yjs WebSocket connection to:", wsUrl);
+            sessionStorage.setItem('coding-session', roomId)
+            providerRef.current = new WebsocketProvider(wsUrl, roomId, docRef.current);
 
-        if (providerRef.current) {
             providerRef.current.awareness.on("update", awarenessUpdateHandler);
+
+            providerRef.current.on("status", ({ status }) => {
+                console.log("Yjs WebSocket status changed:", status);
+                setConnectionStatus(status);
+            });
+
+            providerRef.current.on("sync", (isSynced) => {
+                console.log("Document sync status:", isSynced);
+                setIsInitialized(isSynced);
+            });
+
+            providerRef.current.on("error", (err) => {
+                console.error("Yjs WebSocket error:", err);
+                setError(err.message);
+            });
+        } catch (err) {
+            console.error("Failed to initialize Yjs WebSocket provider:", err);
+            setError(err.message);
         }
 
+        const customWsUrl = `${serverWsUrl}?room=${roomId}&custom=true`;
+        customWsRef.current = new WebSocket(customWsUrl);
+
+        customWsRef.current.addEventListener("open", () => {
+            console.log("Custom WebSocket connected.");
+
+            const message = JSON.stringify(
+                question
+                    ? {
+                          type: "SEND_QUESTION",
+                          question: question,
+                          roomId: roomId,
+                      }
+                    : {
+                          type: "REQUEST_QUESTION",
+                          roomId: roomId,
+                      }
+            );
+            customWsRef.current.send(message);
+            console.log("Custom message sent on WebSocket open:", message);
+        });
+
+        customWsRef.current.addEventListener("message", (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log("Custom message received:", data);
+                if (data.type === "RECEIVE_QUESTION") {
+                    setQuestion(data.question);
+                }
+                
+            } catch (error) {
+                console.error("Error parsing custom WebSocket message:", error);
+            }
+        });
+
+        customWsRef.current.addEventListener("error", (error) => {
+            console.error("Custom WebSocket error:", error);
+        });
+
         return () => {
+            console.log("Cleaning up CollabSpace...");
+            if (isLeaving) {
+                const monacoText = docRef.current.getText('monaco')
+                docRef.current.getText('monaco').delete(0, monacoText.length)
+                const chatMessages = docRef.current.getArray('chatMessages')
+                docRef.current.getArray('chatMessages').delete(0, chatMessages.length)
+                sessionStorage.removeItem('session')
+            }
+
             if (providerRef.current) {
-                const codeType = docRef.current.getText("monaco");
-                codeType.delete(0, codeType.length);
-                console.log("code deleted: ", codeType);
-                const messagesType = docRef.current.getArray("chatMessages");
-                messagesType.delete(0, messagesType.length);
-                console.log("message deleted: ", messagesType);
-                docRef.current.destroy();
-                docRef.current = null;
                 providerRef.current.awareness.off("update", awarenessUpdateHandler);
+                providerRef.current.disconnect();
                 providerRef.current.destroy();
                 providerRef.current = null;
-                hasClosedRef.current = false;
             }
+
+            if (docRef.current) {
+                docRef.current.destroy();
+                docRef.current = null;
+            }
+
+            if (customWsRef.current) {
+                customWsRef.current.close();
+                customWsRef.current = null;
+            }
+
+            hasClosedRef.current = false;
         };
     }, [roomId]);
 
-    if (!isInitialized) {
-        // Render a loading indicator or placeholder until initialization completes
-        return <div>Loading...</div>;
-    }
-
     return (
         <>
+            <Snackbar
+                open={!!error}
+                autoHideDuration={6000}
+                onClose={() => setError(null)}
+                anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            >
+                <Alert severity="error" variant="filled" onClose={() => setError(null)}>
+                    Connection error: {error}
+                </Alert>
+            </Snackbar>
+
             <Snackbar
                 open={showRedirectMessage}
                 autoHideDuration={3000}
@@ -117,6 +192,7 @@ const CollabSpace = () => {
                     You will be redirected soon as the room is closed.
                 </Alert>
             </Snackbar>
+
 
             <Box sx={{ display: "flex", flexDirection: "row", height: "100vh" }}>
                 <Box
@@ -129,15 +205,28 @@ const CollabSpace = () => {
                     }}
                 >
                     <Box sx={{ flexGrow: 4, marginBottom: 2, overflowY: "auto" }}>
-                        <QuestionCard question={question} />
+                        {question && <QuestionCard question={question} />}
                     </Box>
 
-                    <Box sx={{ flexGrow: 2, flexBasis: "50vh", marginBottom: 2, overflowY: "auto" }}>
+                    <Box
+                        sx={{
+                            flexGrow: 2,
+                            flexBasis: "50vh",
+                            marginBottom: 2,
+                            overflowY: "auto",
+                        }}
+                    >
                         {providerRef.current && <Chat provider={providerRef.current} />}
                     </Box>
 
-                    <Box sx={{ width:"100%", alignSelf: "flex-start" }}>
-                        <Button sx={{ width:"100%" }} variant="contained" color="secondary" onClick={handleLeaveRoom} disabled={isLeaving}>
+                    <Box sx={{ width: "100%", alignSelf: "flex-start" }}>
+                        <Button
+                            sx={{ width: "100%" }}
+                            variant="contained"
+                            color="secondary"
+                            onClick={handleLeaveRoom}
+                            disabled={isLeaving}
+                        >
                             {isLeaving ? "Leaving..." : "Leave Room"}
                         </Button>
                     </Box>
@@ -151,12 +240,11 @@ const CollabSpace = () => {
                     }}
                 >
                     <Box sx={{ flexGrow: 1, margin: 2, overflowY: "auto" }}>
-                        <CodeEditor
-                            roomId={roomId}
-                            provider={providerRef.current}
-                            doc={docRef.current}
-                            onRoomClosed={handleRoomClosed}
-                        />
+                        {isInitialized && providerRef.current && docRef.current ? (
+                            <CodeEditor roomId={roomId} provider={providerRef.current} doc={docRef.current} />
+                        ) : (
+                            <Typography>Loading editor...</Typography>
+                        )}
                     </Box>
                 </Box>
             </Box>
@@ -167,7 +255,7 @@ const CollabSpace = () => {
 const QuestionCard = ({ question }) => {
     return (
         <Card variant="outlined" sx={{ maxWidth: 600, margin: "auto", marginTop: 4, padding: 2 }}>
-            <CardContent>                
+            <CardContent>
                 <Typography variant="h5" component="div" gutterBottom>
                     {question.title}
                 </Typography>

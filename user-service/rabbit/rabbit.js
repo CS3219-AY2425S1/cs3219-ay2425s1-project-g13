@@ -1,6 +1,7 @@
 import * as amqp from 'amqplib'
 import "dotenv/config"
 import * as crypto from 'crypto'
+import db, { setData, deleteRoom } from '../db.js'
 
 const REQUEST_EXCHANGE = 'REQUEST-EXCHANGE'
 const RESULT_EXCHANGE = 'RESULT-EXCHANGE'
@@ -20,10 +21,13 @@ const QUESTION_TO_USER_QUEUE = 'QUESTION-TO-USER-QUEUE'
 const MATCH_TO_QUESTION_ROUTING = 'MATCH-TO-QUESTION-ROUTING'
 const QUESTION_TO_USER_ROUTING = 'QUESTION-TO-USER-ROUTING'
 
+const COLLAB_TO_USER_QUEUE = 'COLLAB-TO-USER-QUEUE'
+const COLLAB_TO_USER_ROUTING = 'COLLAB-TO-USER-ROUTING'
+
 
 export const createChannel = async () => {
     try {
-        const connection = await amqp.connect(process.env.RABBIT_URI ? process.env.RABBIT_URI :'amqp://rabbitmq:5672')
+        const connection = await amqp.connect(process.env.RABBIT_URI ? process.env.RABBIT_URI : 'amqp://rabbitmq:5672')
         const channel = await connection.createChannel()
 
         await channel.assertExchange(REQUEST_EXCHANGE, 'direct')
@@ -39,6 +43,10 @@ export const createChannel = async () => {
         // send question request from matching service to question service 
         const matchToQuestionQueue = await channel.assertQueue(MATCH_TO_QUESTION_QUEUE)
         channel.bindQueue(matchToQuestionQueue.queue, REQUEST_EXCHANGE, MATCH_TO_QUESTION_ROUTING)
+
+        const collabToUserQueue = await channel.assertQueue(COLLAB_TO_USER_QUEUE)
+        channel.bindQueue(collabToUserQueue.queue, REQUEST_EXCHANGE, COLLAB_TO_USER_ROUTING)
+        
 
         await channel.assertExchange(RESULT_EXCHANGE, 'direct')
 
@@ -77,25 +85,25 @@ export const sendCancelRequest = (channel, payload) => {
 
 export const receiveMatchResult = async (channel, io) => {
     try {
-        channel.consume(QUESTION_TO_USER_QUEUE, (data) => {
+        channel.consume(QUESTION_TO_USER_QUEUE, async (data) => {
             if (data) {
                 const message = data.content.toString()
                 channel.ack(data)
                 // Emit socket.io event when a match is found
                 const matchData = JSON.parse(message);
 
-                console.log('question: ', matchData.question)
+                console.log('matchData: ', matchData)
 
                 const user1Socket = io.sockets.sockets.get(matchData.user1SocketId); // User 1's socket
                 const user2Socket = io.sockets.sockets.get(matchData.user2SocketId); // User 2's socket
-                const roomId = createRoomId(matchData);
+                const roomId = await createRoomId(matchData);
 
                 if (user1Socket && user2Socket) {
                     // Notify User 1
                     user1Socket.emit('match_found', {
                         success: true,
                         matchedUser: { id: matchData.user2Id },
-                        roomId: roomId,
+                        roomId: String(roomId),
                         question: matchData.question
                     });
 
@@ -103,9 +111,10 @@ export const receiveMatchResult = async (channel, io) => {
                     user2Socket.emit('match_found', {
                         success: true,
                         matchedUser: { id: matchData.user1Id },
-                        roomId: roomId,
+                        roomId: String(roomId),
                         question: matchData.question
                     });
+                    await receiveDeleteRoomRequest(channel)
                 }
             }
         })
@@ -115,13 +124,37 @@ export const receiveMatchResult = async (channel, io) => {
 }
 
 
-const createRoomId = (requestPayload) => {
-    const { userID1, userID2, complexity, category } = requestPayload
-    const payloadString = `${userID1}_${userID2}_${complexity}_${category}`;
-    const roomId = crypto.createHash('sha256').update(payloadString).digest('hex');    
+
+
+const createRoomId = async (requestPayload) => {
+    const { user1Id, user2Id, complexity, category } = requestPayload
+    const payloadString = `${user1Id}_${user2Id}_${complexity}_${category}`;
+    const roomId = crypto.createHash('sha256').update(payloadString).digest('hex');
+    console.log("roomId: ", roomId)
+    if (user1Id && user2Id) {
+        await setData(user1Id, roomId);
+        await setData(user2Id, roomId);
+    }
     return roomId
 }
 
+export const receiveDeleteRoomRequest = async (channel) => {
+    try {
+
+        channel.consume(COLLAB_TO_USER_QUEUE, async (data) => {
+            if (data) {
+                console.log("message arriving to delete room in user service?")
+                const message = data.content.toString()
+                channel.ack(data)
+                
+                const matchData = JSON.parse(message);
+                await deleteRoom(matchData.roomId);
+            }
+        })
+    } catch(e) {
+        console.log(e)
+    }
+}
 
 export const receiveCancelResult = async (channel, io) => {
     try {

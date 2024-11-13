@@ -19,7 +19,8 @@
     "logger": "^0.0.1",
     "nodemon": "^3.1.7",
     "ws": "^8.18.0",
-    "y-websocket": "^2.0.4"
+    "y-websocket": "^2.0.4",
+    "yjs": "^13.6.20"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.5",

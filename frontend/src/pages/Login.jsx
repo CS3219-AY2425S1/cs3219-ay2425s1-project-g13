@@ -17,7 +17,12 @@ const Login = () => {
             sessionStorage.setItem('authorized', response.data.data.authorized)
             sessionStorage.setItem('authorization', response.data.data.accessToken)
             sessionStorage.setItem('username', response.data.data.username)
-            navigate('/users-match')
+            if (sessionStorage.getItem('coding-session')) {
+                const roomId = sessionStorage.getItem('coding-session')
+                navigate(`/collab/${roomId}`)
+            } else {   
+                navigate('/users-match')
+            }
             
             console.log(response);
         } catch (err) {
