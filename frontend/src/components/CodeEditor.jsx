@@ -114,9 +114,9 @@ export default function CodeEditor({ roomId, provider, doc }) {
                     <MenuItem value="python">Python</MenuItem>
                     <MenuItem value="javascript">JavaScript</MenuItem>
                 </Select>
-                <Button variant="contained" /*onClick={formatCode}*/>
+                {/*<Button variant="contained" onClick={formatCode}>
                     Format Code
-                </Button>
+                </Button>*/}
             </Box>
 
             <Editor
