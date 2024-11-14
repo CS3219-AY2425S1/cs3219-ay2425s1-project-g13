@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management     # RabbitMQ image with management UI
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"                  # RabbitMQ server port
+      - "15672:15672"                # RabbitMQ management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: guest   # Default username
+      RABBITMQ_DEFAULT_PASS: guest   # Default password
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  question-service:
+    build: ./question-service
+    image: question-service:latest
+    ports:
+      - "8080:8080"  # Expose question service on port 8080
+    volumes:
+      - ./question-service:/usr/src/app/question-service  # For local development with live reloading
+      - /usr/src/app/question-service/node_modules  # Named volume for node_modules
+    environment:
+      - NODE_ENV=development  # Set environment to development
+    depends_on:      
+      rabbitmq:
+        condition: service_healthy  # Wait until RabbitMQ is healthy
+
+  user-service:
+    build: ./user-service
+    image: user-service:latest 
+    ports:
+      - "8081:8081"  # Expose user service on port 8081
+    volumes:
+      - ./user-service:/usr/src/app/user-service  # For local development with live reloading
+      - /usr/src/app/user-service/node_modules  # Named volume for node_modules
+    environment:
+      - NODE_ENV=development  # Set environment to development
+    depends_on:
+      rabbitmq:
+        condition: service_healthy  # Wait until RabbitMQ is healthy
+
+  matching-service:
+    build: ./matching-service
+    image: matching-service:latest
+    ports:
+      - "8082:8082"  # Expose matching service on port 8082
+    volumes:
+      - ./matching-service:/usr/src/app/matching-service  # For local development with live reloading
+      - /usr/src/app/matching-service/node_modules  # Named volume for node_modules
+    environment:
+      - NODE_ENV=development  # Set environment to development
+    depends_on:
+      rabbitmq:
+        condition: service_healthy  # Wait until RabbitMQ is healthy
+
+  collaboration-service:
+    build: ./collaboration-service
+    image: collaboration-service:latest
+    ports: 
+      - "4444:4444"
+    volumes: 
+      - ./collaboration-service:/usr/src/app/collaboration-service
+      - /usr/src/app/collaboration-service/node_modules
+    environment: 
+      - NODE_ENV=development
+    depends_on: 
+      rabbitmq:
+        condition: service_healthy
+    
+  sandbox-service:
+    build: ./sandbox-service
+    image: sandbox-service:latest
+    ports:
+      - "8084:8084"
+    volumes:
+      - ./sandbox-service:/usr/src/app/sandbox-service
+      - /usr/src/app/sandbox-service/node_modules
+    environment:
+      - NODE_ENV=development  # Set environment to development
+    depends_on:
+      rabbitmq:
+        condition: service_healthy  # Wait until RabbitMQ is healthy
+
+  frontend:
+    build: ./frontend
+    image: frontend:latest
+    ports:
+      - "3000:3000"  # Expose frontend on port 3000
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - question-service
+      - user-service
+      - matching-service
+      - collaboration-service
+      - rabbitmq
+
+# volumes:
+#   question_service_node_modules:
+#   user_service_node_modules:
+#   matching_service_node_modules:
